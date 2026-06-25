@@ -13,6 +13,11 @@ def local():
 
 @app.post("/scan")
 def scan_domain(request: ScanRequest):
-    return {"message": f"Scanning domain: {request.domain}"}
+    result = subprocess.run(
+        ["/home/aufa/go/bin/subfinder", "-d", request.domain, "-timeout", "30"],
+        capture_output=True,
+        text=True
+    )
+    return {"subdomains": result.stdout, "error": result.stderr}
 
-result = subprocess.run(["uvicorn main:app --reload"], capture_output=True, text=True)
+    

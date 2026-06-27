@@ -18,6 +18,12 @@ def scan_domain(request: ScanRequest):
         capture_output=True,
         text=True
     )
-    return {"subdomains": result.stdout, "error": result.stderr}
-
-    
+    subdomains = [s for s in result.stdout.split("\n") if s]
+    httpx_result = subprocess.run(
+        ["/home/aufa/go/bin/httpx", "-silent"],
+        input="\n".join(subdomains),
+        capture_output=True,
+        text=True
+    )
+    live_hosts = [s for s in httpx_result.stdout.split("\n") if s]
+    return {"domain": request.domain, "subdomains": subdomains, "live hosts": live_hosts}

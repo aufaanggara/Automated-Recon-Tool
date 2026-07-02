@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import subprocess
+import json
+from database import SessionLocal, ScanResult, init_db
 
 app = FastAPI()
+init_db()
 
 
 class ScanRequest(BaseModel):
@@ -22,6 +25,7 @@ def scan_domain(request: ScanRequest):
         text=True,
     )
     subdomains = [s for s in result.stdout.split("\n") if s]
+
     httpx_result = subprocess.run(
         ["/home/aufa/go/bin/httpx", "-silent"],
         input="\n".join(subdomains),
@@ -34,6 +38,7 @@ def scan_domain(request: ScanRequest):
         h.removeprefix("https://").removeprefix("http://") for h in live_hosts
     ]
     live_hosts_clean = live_hosts_clean[:10]
+
     nmap = subprocess.run(
         ["nmap", "-sV", "-sC", "--open", "-F"] + live_hosts_clean,
         capture_output=True,
@@ -43,6 +48,19 @@ def scan_domain(request: ScanRequest):
 
     whois = subprocess.run(["whois", request.domain], capture_output=True, text=True)
     whois_result = [s for s in whois.stdout.split("\n") if s]
+
+    db = SessionLocal()
+    scan = ScanResult(
+        domain=request.domain,
+        subdomains=json.dumps(subdomains),
+        live_hosts=json.dumps(live_hosts),
+        nmap_result=json.dumps(nmap_result),
+        whois_result=json.dumps(whois_result),
+    )
+    db.add(scan)
+    db.commit()
+    db.close()
+
     return {
         "domain": request.domain,
         "subdomains": subdomains,
